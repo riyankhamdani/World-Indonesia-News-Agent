@@ -15,7 +15,7 @@ def search_tavily(query):
         "api_key": TAVILY_API_KEY,
         "query": query,
         "topic": "news",
-        "days": 1,                 # ⚡ KUNCI UTAMA: Cuma ambil berita 1 hari terakhir (24 jam)
+        "days": 1,                 # Mengunci berita 24 jam terakhir
         "max_results": 5,
         "search_depth": "advanced"
     }
@@ -43,10 +43,8 @@ def search_tavily(query):
         return []
 
 def get_latest_news():
-    # Ambil tanggal hari ini secara otomatis (Format: August 03, 2026)
     today_str = datetime.now().strftime("%B %d, %Y")
     
-    # Query disisipi tanggal hari ini biar tidak narik berita lama
     queries = {
         "WORLD": f"breaking news geopolitics world economy today {today_str}",
         "INDONESIA": f"berita utama nasional indonesia politik ekonomi hari ini {today_str}",
@@ -54,52 +52,53 @@ def get_latest_news():
     }
     
     news_data = {}
-    print(f"🔎 Searching news specifically for today ({today_str})...")
+    print(f"🔎 Searching fresh news for {today_str}...")
     for category, q in queries.items():
         news_data[category] = search_tavily(q)
         
     return news_data
 
 def summarize_with_groq(news_data):
-    print("🤖 AI summarizing news with Groq Llama 3.3...")
+    print("🤖 AI generating minimal digest with Groq Llama 3.3...")
     llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.1, api_key=GROQ_API_KEY)
     
     prompt = f"""
-    You are a professional News Analyst for Riyan.
-    Summarize the following raw news data into a clean daily digest in Bahasa Indonesia.
+    You are a professional News Digest Assistant for Riyan.
+    Create a VERY SHORT, ULTRA-CONCISE news summary in Bahasa Indonesia from the raw data.
 
     RAW NEWS DATA:
     {news_data}
 
     INSTRUCTIONS:
-    1. Summarize into 3 categories:
-       - 🌐 ISU GLOBAL & GEOPOLITIK
-       - 🇮🇩 ISU NASIONAL INDONESIA
-       - 💻 TECH & AI GLOBAL
-    2. For each item, present:
+    1. Group into 3 sections:
+       - 🌐 **ISU GLOBAL & GEOPOLITIK**
+       - 🇮🇩 **ISU NASIONAL INDONESIA**
+       - 💻 **TECH & AI GLOBAL**
+    2. For each news item, output ONLY:
        - Bold Title
-       - 2-sentence summary explaining why it matters
-       - The EXACT full URL provided in the raw data.
-    3. CRITICAL: Only write summaries based on the raw data provided. Do not shorten or alter the URLs.
+       - 1 short, catchy sentence summary (max 15 words)
+       - Link to full article
+    3. Keep it minimal so Riyan can scan in 10 seconds and click the link if curious.
+    4. ABSOLUTE RULE FOR URL: Copy the exact full "url" string provided in the raw data without changing anything.
 
     Format template:
-    📰 DAILY NEWS DIGEST FOR RIYAN 📰
+    📰 **DAILY NEWS DIGEST** 📰
     ====================================
 
-    🌐 ISU GLOBAL & GEOPOLITIK
+    🌐 **ISU GLOBAL & GEOPOLITIK**
     • [Judul Berita]
-      Summary: [Penjelasan ringkas 2 kalimat]
-      🔗 Link: [EXACT_URL_FROM_DATA]
+      [Ringkasan 1 kalimat singkat]
+      🔗 Baca selengkapnya: [EXACT_URL_FROM_DATA]
 
-    🇮🇩 ISU NASIONAL INDONESIA
+    🇮🇩 **ISU NASIONAL INDONESIA**
     • [Judul Berita]
-      Summary: [Penjelasan ringkas 2 kalimat]
-      🔗 Link: [EXACT_URL_FROM_DATA]
+      [Ringkasan 1 kalimat singkat]
+      🔗 Baca selengkapnya: [EXACT_URL_FROM_DATA]
 
-    💻 TECH & AI GLOBAL
+    💻 **TECH & AI GLOBAL**
     • [Judul Berita]
-      Summary: [Penjelasan ringkas 2 kalimat]
-      🔗 Link: [EXACT_URL_FROM_DATA]
+      [Ringkasan 1 kalimat singkat]
+      🔗 Baca selengkapnya: [EXACT_URL_FROM_DATA]
     """
     
     try:
@@ -123,7 +122,7 @@ def send_telegram(text):
     
     res = requests.post(url, json=payload)
     if res.status_code == 200:
-        print("🚀 News Digest successfully sent to Telegram!")
+        print("🚀 Compact News Digest successfully sent to Telegram!")
     else:
         print(f"❌ Telegram Send Failed: {res.text}")
 
