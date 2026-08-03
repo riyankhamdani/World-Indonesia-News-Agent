@@ -13,28 +13,44 @@ def search_tavily(query):
     payload = {
         "api_key": TAVILY_API_KEY,
         "query": query,
-        "max_results": 3,
-        "search_depth": "basic"
+        "max_results": 4,
+        "search_depth": "advanced", # Pake advanced biar dapet deep link artikel
+        "include_domains": []
     }
     try:
         response = requests.post(url, json=payload, timeout=15)
         if response.status_code == 200:
             results = response.json().get("results", [])
-            return [{"title": r.get("title"), "url": r.get("url"), "snippet": r.get("content", "")[:300]} for r in results]
+            
+            # Saring HANYA link spesifik (yang punya path/slug panjang, bukan cuma domain utama)
+            valid_articles = []
+            for r in results:
+                link = r.get("url", "")
+                # Minimal ada path artikel (misal ada slash setelah domain)
+                if link.count("/") >= 4 or ".html" in link or "-" in link.split("/")[-1]:
+                    valid_articles.append({
+                        "title": r.get("title"),
+                        "url": link,
+                        "snippet": r.get("content", "")[:300]
+                    })
+            
+            # Kalo penyeleksian ketat dapet hasil, pake itu. Kalo gak, pake default results
+            return valid_articles if valid_articles else [{"title": r.get("title"), "url": r.get("url"), "snippet": r.get("content", "")[:300]} for r in results]
         return []
     except Exception as e:
         print(f"Error searching '{query}': {e}")
         return []
 
 def get_latest_news():
+    # Query dibuat lebih spesifik ke peristiwa hari ini biar dapet artikel spesifik
     queries = {
-        "WORLD": "top global news headlines geopolitics world economy today",
-        "INDONESIA": "berita utama indonesia terkini politik ekonomi isu nasional hari ini",
-        "TECH": "latest global tech news artificial intelligence breakthrough today"
+        "WORLD": "breaking news world politics economy world today site:reuters.com OR site:apnews.com OR site:bbc.com",
+        "INDONESIA": "berita hari ini nasional politik ekonomi site:detik.com OR site:kompas.com OR site:cnnindonesia.com",
+        "TECH": "latest artificial intelligence tech news article today site:techcrunch.com OR site:theverge.com"
     }
     
     news_data = {}
-    print("🔎 Searching global and national news...")
+    print("🔎 Searching specific article links...")
     for category, q in queries.items():
         news_data[category] = search_tavily(q)
         
@@ -42,25 +58,25 @@ def get_latest_news():
 
 def summarize_with_groq(news_data):
     print("🤖 AI summarizing news with Groq Llama 3.3...")
-    # Setting temperature ke 0.1 agar AI patuh pada instruksi URL presisi
     llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.1, api_key=GROQ_API_KEY)
     
     prompt = f"""
     You are a professional News Analyst for Riyan.
-    Summarize the following raw search news into a clean, engaging daily digest in Bahasa Indonesia.
+    Summarize the following raw search news into a clean daily digest in Bahasa Indonesia.
 
     RAW NEWS DATA:
     {news_data}
 
     INSTRUCTIONS:
     1. Group the report into 3 sections:
-       - 🌐 ISU GLOBAL & GEOPOLITIK (2 berita utama dunia)
-       - 🇮🇩 ISU NASIONAL INDONESIA (2 berita utama Indonesia)
-       - 💻 TECH & AI GLOBAL (1-2 berita tech paling menarik)
-    2. For each item, provide a bold title, a short 2-sentence summary explaining WHY it matters, and the EXACT FULL URL.
-    3. CRITICAL URL RULE: You MUST use the exact full URL provided in the RAW NEWS DATA for each story. Do not truncate, shorten, or alter the URL domain.
-    4. Keep it objective, clear, concise, and easy to read on mobile.
-    5. DO NOT use Markdown tables. Use bullet points and clean plain text formatting for Telegram.
+       - 🌐 ISU GLOBAL & GEOPOLITIK (2 berita)
+       - 🇮🇩 ISU NASIONAL INDONESIA (2 berita)
+       - 💻 TECH & AI GLOBAL (1-2 berita)
+    2. For each item, display:
+       - Title
+       - 2-sentence summary
+       - The EXACT URL provided in the RAW DATA.
+    3. ABSOLUTE RULE FOR LINKS: Do NOT edit, truncate, or invent any URL. Copy the exact "url" string from the raw data.
 
     Format template:
     📰 DAILY NEWS DIGEST FOR RIYAN 📰
@@ -69,17 +85,17 @@ def summarize_with_groq(news_data):
     🌐 ISU GLOBAL & GEOPOLITIK
     • [Judul Berita]
       Summary: [Penjelasan ringkas 2 kalimat]
-      🔗 Link: [EXACT_FULL_URL]
+      🔗 Link: [EXACT_URL_FROM_DATA]
 
     🇮🇩 ISU NASIONAL INDONESIA
     • [Judul Berita]
       Summary: [Penjelasan ringkas 2 kalimat]
-      🔗 Link: [EXACT_FULL_URL]
+      🔗 Link: [EXACT_URL_FROM_DATA]
 
     💻 TECH & AI GLOBAL
     • [Judul Berita]
       Summary: [Penjelasan ringkas 2 kalimat]
-      🔗 Link: [EXACT_FULL_URL]
+      🔗 Link: [EXACT_URL_FROM_DATA]
     """
     
     try:
