@@ -20,7 +20,7 @@ def search_tavily(query):
         response = requests.post(url, json=payload, timeout=15)
         if response.status_code == 200:
             results = response.json().get("results", [])
-            return [{"title": r.get("title"), "url": r.get("url"), "snippet": r.get("content", "")[:250]} for r in results]
+            return [{"title": r.get("title"), "url": r.get("url"), "snippet": r.get("content", "")[:300]} for r in results]
         return []
     except Exception as e:
         print(f"Error searching '{query}': {e}")
@@ -42,7 +42,8 @@ def get_latest_news():
 
 def summarize_with_groq(news_data):
     print("🤖 AI summarizing news with Groq Llama 3.3...")
-    llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.2, api_key=GROQ_API_KEY)
+    # Setting temperature ke 0.1 agar AI patuh pada instruksi URL presisi
+    llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.1, api_key=GROQ_API_KEY)
     
     prompt = f"""
     You are a professional News Analyst for Riyan.
@@ -53,31 +54,32 @@ def summarize_with_groq(news_data):
 
     INSTRUCTIONS:
     1. Group the report into 3 sections:
-       - 🌐 **ISU GLOBAL & GEOPOLITIK** (2 berita utama dunia)
-       - 🇮🇩 **ISU NASIONAL INDONESIA** (2 berita utama Indonesia)
-       - 💻 **TECH & AI GLOBAL** (1-2 berita tech paling menarik)
-    2. For each news item, give a title, a short 2-sentence summary explaining WHY it matters, and the source URL.
-    3. Keep it objective, clear, concise, and easy to read on mobile.
-    4. DO NOT use fancy Markdown tables or markdown symbols that break telegram. Use plain text formatting.
+       - 🌐 ISU GLOBAL & GEOPOLITIK (2 berita utama dunia)
+       - 🇮🇩 ISU NASIONAL INDONESIA (2 berita utama Indonesia)
+       - 💻 TECH & AI GLOBAL (1-2 berita tech paling menarik)
+    2. For each item, provide a bold title, a short 2-sentence summary explaining WHY it matters, and the EXACT FULL URL.
+    3. CRITICAL URL RULE: You MUST use the exact full URL provided in the RAW NEWS DATA for each story. Do not truncate, shorten, or alter the URL domain.
+    4. Keep it objective, clear, concise, and easy to read on mobile.
+    5. DO NOT use Markdown tables. Use bullet points and clean plain text formatting for Telegram.
 
     Format template:
-    DAILY NEWS DIGEST FOR RIYAN
+    📰 DAILY NEWS DIGEST FOR RIYAN 📰
     ====================================
 
     🌐 ISU GLOBAL & GEOPOLITIK
     • [Judul Berita]
-      Summary: [Penjelasan ringkas]
-      Link: [URL]
+      Summary: [Penjelasan ringkas 2 kalimat]
+      🔗 Link: [EXACT_FULL_URL]
 
     🇮🇩 ISU NASIONAL INDONESIA
     • [Judul Berita]
-      Summary: [Penjelasan ringkas]
-      Link: [URL]
+      Summary: [Penjelasan ringkas 2 kalimat]
+      🔗 Link: [EXACT_FULL_URL]
 
     💻 TECH & AI GLOBAL
     • [Judul Berita]
-      Summary: [Penjelasan ringkas]
-      Link: [URL]
+      Summary: [Penjelasan ringkas 2 kalimat]
+      🔗 Link: [EXACT_FULL_URL]
     """
     
     try:
