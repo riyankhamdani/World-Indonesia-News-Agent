@@ -1,5 +1,6 @@
 import os
 import requests
+from datetime import datetime
 from langchain_groq import ChatGroq
 
 # Credentials
@@ -13,7 +14,8 @@ def search_tavily(query):
     payload = {
         "api_key": TAVILY_API_KEY,
         "query": query,
-        "topic": "news",          # Memaksa Tavily mengambil mode BERITA SPESIFIK
+        "topic": "news",
+        "days": 1,                 # ⚡ KUNCI UTAMA: Cuma ambil berita 1 hari terakhir (24 jam)
         "max_results": 5,
         "search_depth": "advanced"
     }
@@ -25,8 +27,6 @@ def search_tavily(query):
             valid_articles = []
             for r in results:
                 link = r.get("url", "")
-                
-                # Filter ketat: Pastikan URL mengandung angka/slug berita (bukan sekadar halaman kategori)
                 is_specific_url = any(char.isdigit() for char in link) or "-" in link.split("/")[-1] or ".html" in link
                 
                 if is_specific_url and len(link.split("/")) > 3:
@@ -36,7 +36,6 @@ def search_tavily(query):
                         "snippet": r.get("content", "")[:300]
                     })
             
-            # Ambil maksimal 2 artikel paling spesifik
             return valid_articles[:2] if valid_articles else [{"title": r.get("title"), "url": r.get("url"), "snippet": r.get("content", "")[:300]} for r in results[:2]]
         return []
     except Exception as e:
@@ -44,14 +43,18 @@ def search_tavily(query):
         return []
 
 def get_latest_news():
+    # Ambil tanggal hari ini secara otomatis (Format: August 03, 2026)
+    today_str = datetime.now().strftime("%B %d, %Y")
+    
+    # Query disisipi tanggal hari ini biar tidak narik berita lama
     queries = {
-        "WORLD": "latest geopolitics world news breaking today",
-        "INDONESIA": "berita terkini politik ekonomi indonesia hari ini",
-        "TECH": "latest artificial intelligence tech news article today"
+        "WORLD": f"breaking news geopolitics world economy today {today_str}",
+        "INDONESIA": f"berita utama nasional indonesia politik ekonomi hari ini {today_str}",
+        "TECH": f"latest artificial intelligence tech news breakthrough {today_str}"
     }
     
     news_data = {}
-    print("🔎 Searching specific article news...")
+    print(f"🔎 Searching news specifically for today ({today_str})...")
     for category, q in queries.items():
         news_data[category] = search_tavily(q)
         
@@ -77,7 +80,7 @@ def summarize_with_groq(news_data):
        - Bold Title
        - 2-sentence summary explaining why it matters
        - The EXACT full URL provided in the raw data.
-    3. RULE: Do NOT shorten or alter the URLs. Copy the full link string exact as given.
+    3. CRITICAL: Only write summaries based on the raw data provided. Do not shorten or alter the URLs.
 
     Format template:
     📰 DAILY NEWS DIGEST FOR RIYAN 📰
