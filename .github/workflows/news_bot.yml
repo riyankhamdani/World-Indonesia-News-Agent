@@ -1,0 +1,33 @@
+name: Daily News Bot Execution (Jam 5 Sore WIB)
+
+on:
+  schedule:
+    - cron: '0 10 * * *'  # Jam 10:00 UTC = Jam 17:00 (5 sore) WIB
+  workflow_dispatch:      # Biar bisa dites klik manual dari tab Actions
+
+jobs:
+  run-bot:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          pip install --upgrade pip
+          pip install requests pyTelegramBotAPI langchain-groq tavily-python
+
+      - name: Run News Bot Script (Mode Cron)
+        env:
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          TAVILY_API_KEY: ${{ secrets.TAVILY_API_KEY }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RUN_MODE: cron
+        run: |
+          python agent.py
