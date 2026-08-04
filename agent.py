@@ -1,17 +1,25 @@
 import os
+import sys
 import requests
 import telebot
 from datetime import datetime
 from langchain_groq import ChatGroq
 
-# Credentials
+# Environment Credentials
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN)
+# Inisialisasi Bot
+bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 
 def search_tavily(query):
+    """Mencari berita terbaru menggunakan Tavily Search API."""
+    if not TAVILY_API_KEY:
+        print("⚠️ Warning: TAVILY_API_KEY tidak ditemukan.")
+        return []
+
     url = "https://api.tavily.com/search"
     payload = {
         "api_key": TAVILY_API_KEY,
@@ -30,13 +38,29 @@ def search_tavily(query):
                 link = r.get("url", "")
                 is_specific = any(char.isdigit() for char in link) or "-" in link.split("/")[-1]
                 if is_specific and len(link.split("/")) > 3:
-                    valid_articles.append({"title": r.get("title"), "url": link, "snippet": r.get("content", "")[:300]})
-            return valid_articles[:2] if valid_articles else [{"title": r.get("title"), "url": r.get("url"), "snippet": r.get("content", "")[:300]} for r in results[:2]]
-        return []
+                    valid_articles.append({
+                        "title": r.get("title", "Berita Tanpa Judul"),
+                        "url": link,
+                        "snippet": r.get("content", "")[:300]
+                    })
+            if valid_articles:
+                return valid_articles[:2]
+            return [
+                {
+                    "title": r.get("title", "Berita Tanpa Judul"),
+                    "url": r.get("url", ""),
+                    "snippet": r.get("content", "")[:300]
+                } for r in results[:2]
+            ]
+        else:
+            print(f"❌ Tavily Error status code: {response.status_code}")
+            return []
     except Exception as e:
+        print(f"❌ Error fetching news from Tavily: {e}")
         return []
 
 def get_news_digest():
+    """Mengambil berita & merangkumnya menggunakan Groq LLaMA 3.3."""
     today_str = datetime.now().strftime("%B %d, %Y")
     queries = {
         "WORLD": f"breaking news geopolitics world economy today {today_str}",
@@ -45,50 +69,97 @@ def get_news_digest():
     }
     news_data = {cat: search_tavily(q) for cat, q in queries.items()}
     
-    llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0.1, api_key=GROQ_API_KEY)
-    prompt = f"""
-    You are Riyan's News Assistant. Summarize into Bahasa Indonesia:
-    RAW NEWS: {news_data}
-    
-    Format:
-    📰 **DAILY NEWS DIGEST** 📰
-    ====================================
-    🌐 **ISU GLOBAL & GEOPOLITIK**
-    • [Judul]
-      [Ringkasan 1 kalimat]
-      🔗 Baca selengkapnya: [URL]
+    if not GROQ_API_KEY:
+        return "❌ Error: GROQ_API_KEY belum dikonfigurasi."
 
-    🇮🇩 **ISU NASIONAL INDONESIA**
-    • [Judul]
-      [Ringkasan 1 kalimat]
-      🔗 Baca selengkapnya: [URL]
+    try:
+        llm = ChatGroq(
+            model_name="llama-3.3-70b-versatile",
+            temperature=0.1,
+            api_key=GROQ_API_KEY
+        )
+        prompt = f"""
+You are Riyan's News Assistant. Summarize into natural, concise Bahasa Indonesia.
+RAW NEWS: {news_data}
 
-    💻 **TECH & AI GLOBAL**
-    • [Judul]
-      [Ringkasan 1 kalimat]
-      🔗 Baca selengkapnya: [URL]
-    """
-    return llm.invoke(prompt).content
+Instructions:
+1. Return ONLY the formatted message below.
+2. Ensure links are included and valid.
+3. Keep summaries clear and to the point (1-2 sentences per item).
 
-# --- LISENER PESAN (INTERAKTIF KAYAK USER) ---
+Format:
+📰 **DAILY NEWS DIGEST** 📰
+====================================
 
-@bot.message_handler(commands=['start', 'help'])
-def send_welcome(message):
-    bot.reply_to(message, "Halo! Gue Riyan News Agent Bot 🤖\nKetik 'berita' atau /news buat dapet rangkuman berita terbaru hari ini ya!")
+🌐 **ISU GLOBAL & GEOPOLITIK**
+• [Judul]
+  [Ringkasan 1-2 kalimat]
+  🔗 Baca selengkapnya: [URL]
 
-@bot.message_handler(func=lambda msg: True)
-def handle_all_messages(message):
-    text = message.text.lower()
-    
-    if "berita" in text or "news" in text:
+🇮🇩 **ISU NASIONAL INDONESIA**
+• [Judul]
+  [Ringkasan 1-2 kalimat]
+  🔗 Baca selengkapnya: [URL]
+
+💻 **TECH & AI GLOBAL**
+• [Judul]
+  [Ringkasan 1-2 kalimat]
+  🔗 Baca selengkapnya: [URL]
+"""
+        response = llm.invoke(prompt)
+        return response.content
+    except Exception as e:
+        print(f"❌ Error generating summary with LLM: {e}")
+        return "⚠️ Gagal membuat rangkuman berita. Silakan coba beberapa saat lagi."
+
+# --- HANDLER INTERAKTIF (Untuk mode Server/Polling 24/7) ---
+if bot:
+    @bot.message_handler(commands=['start', 'help'])
+    def send_welcome(message):
+        bot.reply_to(
+            message,
+            "Halo! Gue Riyan News Agent Bot 🤖\n\n"
+            "Ketik 'berita' atau /news buat dapet rangkuman berita terbaru hari ini ya!"
+        )
+
+    @bot.message_handler(commands=['news'])
+    def send_news_command(message):
         bot.reply_to(message, "🔎 Bentar ya, lagi nyariin berita paling fresh hari ini...")
         report = get_news_digest()
-        bot.send_message(message.chat.id, report, disable_web_page_preview=True)
-    elif "riyan" in text or "oi" in text:
-        bot.reply_to(message, "Halo! Riyan-nya lagi rehat/shift malam nih 😴 Kalo mau tau info berita hari ini, ketik 'berita' aja ya!")
-    else:
-        bot.reply_to(message, "Ketik 'berita' kalau mau dapet update berita terbaru hari ini ya! 😉")
+        bot.send_message(message.chat.id, report, disable_web_page_preview=True, parse_mode="Markdown")
 
+    @bot.message_handler(func=lambda msg: True)
+    def handle_all_messages(message):
+        text = message.text.lower() if message.text else ""
+        
+        if "berita" in text or "news" in text:
+            bot.reply_to(message, "🔎 Bentar ya, lagi nyariin berita paling fresh hari ini...")
+            report = get_news_digest()
+            bot.send_message(message.chat.id, report, disable_web_page_preview=True, parse_mode="Markdown")
+        elif "riyan" in text or "oi" in text or text.strip() == "p":
+            bot.reply_to(message, "Halo! Riyan-nya lagi rehat/shift malam nih 😴 Kalo mau tau info berita hari ini, ketik 'berita' aja ya!")
+        else:
+            bot.reply_to(message, "Ketik 'berita' kalau mau dapet update berita terbaru hari ini ya! 😉")
+
+# --- PENENTU MODE EKSEKUSI ---
 if __name__ == "__main__":
-    print("🤖 Bot interaktif siap melayani cewek lu 24/7...")
-    bot.infinity_polling()
+    is_cron_mode = "--cron" in sys.argv or os.getenv("RUN_MODE") == "cron"
+
+    if is_cron_mode:
+        print("🚀 Menjalankan Bot dalam MODE CRON (GitHub Actions)...")
+        if not TELEGRAM_BOT_TOKEN or not TELEGRAM_CHAT_ID:
+            print("❌ Error: TELEGRAM_BOT_TOKEN atau TELEGRAM_CHAT_ID belum diset di secrets.")
+            sys.exit(1)
+            
+        print("🔎 Mengambil dan merangkum berita...")
+        report = get_news_digest()
+        
+        print(f"📤 Mengirim pesan ke Chat ID: {TELEGRAM_CHAT_ID}...")
+        bot.send_message(TELEGRAM_CHAT_ID, report, disable_web_page_preview=True, parse_mode="Markdown")
+        print("✅ Berhasil dikirim! Selesai.")
+    else:
+        print("🤖 Bot interaktif siap melayani 24/7 (Mode Polling)...")
+        if bot:
+            bot.infinity_polling()
+        else:
+            print("❌ Error: TELEGRAM_BOT_TOKEN tidak dikonfigurasi.")
