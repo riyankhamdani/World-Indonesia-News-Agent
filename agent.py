@@ -11,7 +11,7 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# Inisialisasi Bot
+# Inisialisasi Bot secara aman
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 
 def search_tavily(query):
@@ -126,7 +126,7 @@ if bot:
     def send_news_command(message):
         bot.reply_to(message, "🔎 Bentar ya, lagi nyariin berita paling fresh hari ini...")
         report = get_news_digest()
-        bot.send_message(message.chat.id, report, disable_web_page_preview=True, parse_mode="Markdown")
+        send_safe_message(message.chat.id, report)
 
     @bot.message_handler(func=lambda msg: True)
     def handle_all_messages(message):
@@ -135,11 +135,22 @@ if bot:
         if "berita" in text or "news" in text:
             bot.reply_to(message, "🔎 Bentar ya, lagi nyariin berita paling fresh hari ini...")
             report = get_news_digest()
-            bot.send_message(message.chat.id, report, disable_web_page_preview=True, parse_mode="Markdown")
+            send_safe_message(message.chat.id, report)
         elif "riyan" in text or "oi" in text or text.strip() == "p":
             bot.reply_to(message, "Halo! Riyan-nya lagi rehat/shift malam nih 😴 Kalo mau tau info berita hari ini, ketik 'berita' aja ya!")
         else:
             bot.reply_to(message, "Ketik 'berita' kalau mau dapet update berita terbaru hari ini ya! 😉")
+
+def send_safe_message(chat_id, text):
+    """Mengirim pesan dengan fallback aman jika Markdown error."""
+    if not bot:
+        print("❌ Bot instance tidak ditemukan.")
+        return
+    try:
+        bot.send_message(chat_id, text, disable_web_page_preview=True, parse_mode="Markdown")
+    except Exception as e:
+        print(f"⚠️ Gagal kirim via Markdown ({e}). Mencoba kirim teks biasa...")
+        bot.send_message(chat_id, text, disable_web_page_preview=True)
 
 # --- PENENTU MODE EKSEKUSI ---
 if __name__ == "__main__":
@@ -155,7 +166,7 @@ if __name__ == "__main__":
         report = get_news_digest()
         
         print(f"📤 Mengirim pesan ke Chat ID: {TELEGRAM_CHAT_ID}...")
-        bot.send_message(TELEGRAM_CHAT_ID, report, disable_web_page_preview=True, parse_mode="Markdown")
+        send_safe_message(TELEGRAM_CHAT_ID, report)
         print("✅ Berhasil dikirim! Selesai.")
     else:
         print("🤖 Bot interaktif siap melayani 24/7 (Mode Polling)...")
