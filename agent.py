@@ -60,7 +60,7 @@ def search_tavily(query):
         return []
 
 def get_news_digest():
-    """Mengambil berita & merangkumnya menggunakan Groq LLaMA 3."""
+    """Mengambil berita & merangkumnya menggunakan Groq LLaMA 3.1 Instant."""
     today_str = datetime.now().strftime("%B %d, %Y")
     queries = {
         "WORLD": f"breaking news geopolitics world economy today {today_str}",
@@ -73,9 +73,9 @@ def get_news_digest():
         return "❌ Error: GROQ_API_KEY belum dikonfigurasi."
 
     try:
-        # Menggunakan model llama3-70b-8192 yang paling stabil & long-standing di Groq
+        # Menggunakan model llama-3.1-8b-instant yang dijamin aktif & anti-decommission di Groq
         llm = ChatGroq(
-            model_name="llama3-70b-8192",
+            model_name="llama-3.1-8b-instant",
             temperature=0.1,
             api_key=GROQ_API_KEY
         )
