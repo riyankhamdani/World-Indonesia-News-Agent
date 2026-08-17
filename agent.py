@@ -73,11 +73,14 @@ def get_news_digest():
         return "❌ Error: GROQ_API_KEY belum dikonfigurasi."
 
     try:
+        # --- PERBAIKAN DI SINI ---
+        # Mengganti model_name yang deprecated/tidak ditemukan
         llm = ChatGroq(
-            model_name="llama-3.3-70b-versatile",
+            model_name="llama-3.3-70b-specdec", # Opsi lain yang stabil: "llama3-70b-8192" atau "llama-3.1-70b-versatile"
             temperature=0.1,
             api_key=GROQ_API_KEY
         )
+        # -------------------------
         prompt = f"""
 You are Riyan's News Assistant. Summarize into natural, concise Bahasa Indonesia.
 RAW NEWS: {news_data}
@@ -110,7 +113,10 @@ Format:
         return response.content
     except Exception as e:
         print(f"❌ Error generating summary with LLM: {e}")
-        return "⚠️ Gagal membuat rangkuman berita. Silakan coba beberapa saat lagi."
+        # --- PERBAIKAN DI SINI ---
+        # Menggunakan raise e agar GitHub Actions menampilkan status ❌ Failed jika API bermasalah.
+        raise e 
+        # -------------------------
 
 # --- HANDLER INTERAKTIF (Untuk mode Server/Polling 24/7) ---
 if bot:
@@ -125,8 +131,11 @@ if bot:
     @bot.message_handler(commands=['news'])
     def send_news_command(message):
         bot.reply_to(message, "🔎 Bentar ya, lagi nyariin berita paling fresh hari ini...")
-        report = get_news_digest()
-        send_safe_message(message.chat.id, report)
+        try:
+            report = get_news_digest()
+            send_safe_message(message.chat.id, report)
+        except Exception:
+            send_safe_message(message.chat.id, "⚠️ Gagal membuat rangkuman berita. Kemungkinan API Key Groq bermasalah. Silakan coba beberapa saat lagi.")
 
     @bot.message_handler(func=lambda msg: True)
     def handle_all_messages(message):
@@ -134,8 +143,11 @@ if bot:
         
         if "berita" in text or "news" in text:
             bot.reply_to(message, "🔎 Bentar ya, lagi nyariin berita paling fresh hari ini...")
-            report = get_news_digest()
-            send_safe_message(message.chat.id, report)
+            try:
+                report = get_news_digest()
+                send_safe_message(message.chat.id, report)
+            except Exception:
+                send_safe_message(message.chat.id, "⚠️ Gagal membuat rangkuman berita. Kemungkinan API Key Groq bermasalah. Silakan coba beberapa saat lagi.")
         elif "riyan" in text or "oi" in text or text.strip() == "p":
             bot.reply_to(message, "Halo! Riyan-nya lagi rehat/shift malam nih 😴 Kalo mau tau info berita hari ini, ketik 'berita' aja ya!")
         else:
@@ -163,11 +175,16 @@ if __name__ == "__main__":
             sys.exit(1)
             
         print("🔎 Mengambil dan merangkum berita...")
-        report = get_news_digest()
-        
-        print(f"📤 Mengirim pesan ke Chat ID: {TELEGRAM_CHAT_ID}...")
-        send_safe_message(TELEGRAM_CHAT_ID, report)
-        print("✅ Berhasil dikirim! Selesai.")
+        try:
+            report = get_news_digest()
+            print(f"📤 Mengirim pesan ke Chat ID: {TELEGRAM_CHAT_ID}...")
+            send_safe_message(TELEGRAM_CHAT_ID, report)
+            print("✅ Berhasil dikirim! Selesai.")
+        except Exception:
+            print("❌ Gagal membuat rangkuman. Pesan kegagalan akan dikirim ke Telegram (jika bot aktif).")
+            # Dalam mode cron, kita tidak kirim pesan gagal ke Telegram agar tidak mengotorin channel.
+            # Kita biarkan raise e di get_news_digest mem-failkan GitHub Actions workflow.
+            sys.exit(1)
     else:
         print("🤖 Bot interaktif siap melayani 24/7 (Mode Polling)...")
         if bot:
