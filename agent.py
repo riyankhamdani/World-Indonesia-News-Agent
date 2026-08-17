@@ -3,10 +3,10 @@ import sys
 import requests
 import telebot
 from datetime import datetime
-from groq import Groq
+from google import genai
 
 # Environment Credentials
-GROQ_API_KEY = os.getenv("GROQ_API_KEY")
+GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
 TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
@@ -60,7 +60,7 @@ def search_tavily(query):
         return []
 
 def get_news_digest():
-    """Mengambil berita & merangkumnya menggunakan SDK Resmi Groq."""
+    """Mengambil berita & merangkumnya menggunakan Google Gemini API."""
     today_str = datetime.now().strftime("%B %d, %Y")
     queries = {
         "WORLD": f"breaking news geopolitics world economy today {today_str}",
@@ -69,12 +69,12 @@ def get_news_digest():
     }
     news_data = {cat: search_tavily(q) for cat, q in queries.items()}
     
-    if not GROQ_API_KEY:
-        return "❌ Error: GROQ_API_KEY belum dikonfigurasi."
+    if not GEMINI_API_KEY:
+        return "❌ Error: GEMINI_API_KEY belum dikonfigurasi."
 
     try:
-        # Menggunakan SDK resmi Groq & Model Llama 3.3 70B Versatile
-        client = Groq(api_key=GROQ_API_KEY)
+        # Menggunakan SDK resmi Google GenAI & Gemini Flash
+        client = genai.Client(api_key=GEMINI_API_KEY)
         
         prompt = f"""
 You are Riyan's News Assistant. Summarize into natural, concise Bahasa Indonesia.
@@ -104,14 +104,11 @@ Format:
   [Ringkasan 1-2 kalimat]
   🔗 Baca selengkapnya: [URL]
 """
-        completion = client.chat.completions.create(
-            model="llama-3.3-70b-versatile",
-            messages=[
-                {"role": "user", "content": prompt}
-            ],
-            temperature=0.1
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
         )
-        return completion.choices[0].message.content
+        return response.text
     except Exception as e:
         print(f"❌ Error generating summary with LLM: {e}")
         raise e
