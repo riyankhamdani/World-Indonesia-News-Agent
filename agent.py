@@ -58,7 +58,7 @@ def search_tavily(query):
         return []
 
 def get_news_digest():
-    """Mengambil berita & merangkumnya menggunakan SDK Resmi Google GenAI."""
+    """Mengambil berita & merangkumnya menggunakan Google Gemini API."""
     today_str = datetime.now().strftime("%B %d, %Y")
     queries = {
         "WORLD": f"breaking news geopolitics world economy today {today_str}",
@@ -71,7 +71,6 @@ def get_news_digest():
         return "❌ Error: GEMINI_API_KEY belum dikonfigurasi."
 
     try:
-        # Menggunakan SDK baru google.genai & Gemini 2.5 Flash
         client = genai.Client(api_key=GEMINI_API_KEY)
         
         prompt = f"""
@@ -102,8 +101,9 @@ Format:
   [Ringkasan 1-2 kalimat]
   🔗 Baca selengkapnya: [URL]
 """
+        # Menggunakan gemini-3.6-flash sesuai rekomendasi API
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-3.6-flash",
             contents=prompt,
         )
         return response.text
