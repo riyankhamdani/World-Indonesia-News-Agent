@@ -3,7 +3,7 @@ import sys
 import requests
 import telebot
 from datetime import datetime
-import google.generativeai as genai
+from google import genai
 
 # Environment Credentials
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -58,7 +58,7 @@ def search_tavily(query):
         return []
 
 def get_news_digest():
-    """Mengambil berita & merangkumnya menggunakan Google Gemini API."""
+    """Mengambil berita & merangkumnya menggunakan SDK Resmi Google GenAI."""
     today_str = datetime.now().strftime("%B %d, %Y")
     queries = {
         "WORLD": f"breaking news geopolitics world economy today {today_str}",
@@ -71,9 +71,8 @@ def get_news_digest():
         return "❌ Error: GEMINI_API_KEY belum dikonfigurasi."
 
     try:
-        # Konfigurasi SDK google-generativeai
-        genai.configure(api_key=GEMINI_API_KEY)
-        model = genai.GenerativeModel('gemini-1.5-flash')
+        # Menggunakan SDK baru google.genai & Gemini 2.5 Flash
+        client = genai.Client(api_key=GEMINI_API_KEY)
         
         prompt = f"""
 You are Riyan's News Assistant. Summarize into natural, concise Bahasa Indonesia.
@@ -103,7 +102,10 @@ Format:
   [Ringkasan 1-2 kalimat]
   🔗 Baca selengkapnya: [URL]
 """
-        response = model.generate_content(prompt)
+        response = client.models.generate_content(
+            model="gemini-2.5-flash",
+            contents=prompt,
+        )
         return response.text
     except Exception as e:
         print(f"❌ Error generating summary with LLM: {e}")
