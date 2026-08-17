@@ -60,7 +60,7 @@ def search_tavily(query):
         return []
 
 def get_news_digest():
-    """Mengambil berita & merangkumnya menggunakan Groq LLaMA 3.3."""
+    """Mengambil berita & merangkumnya menggunakan Groq LLaMA 3."""
     today_str = datetime.now().strftime("%B %d, %Y")
     queries = {
         "WORLD": f"breaking news geopolitics world economy today {today_str}",
@@ -73,14 +73,12 @@ def get_news_digest():
         return "❌ Error: GROQ_API_KEY belum dikonfigurasi."
 
     try:
-        # --- PERBAIKAN DI SINI ---
-        # Mengganti model_name yang deprecated/tidak ditemukan
+        # Menggunakan model llama3-70b-8192 yang paling stabil & long-standing di Groq
         llm = ChatGroq(
-            model_name="llama-3.3-70b-specdec", # Opsi lain yang stabil: "llama3-70b-8192" atau "llama-3.1-70b-versatile"
+            model_name="llama3-70b-8192",
             temperature=0.1,
             api_key=GROQ_API_KEY
         )
-        # -------------------------
         prompt = f"""
 You are Riyan's News Assistant. Summarize into natural, concise Bahasa Indonesia.
 RAW NEWS: {news_data}
@@ -113,10 +111,7 @@ Format:
         return response.content
     except Exception as e:
         print(f"❌ Error generating summary with LLM: {e}")
-        # --- PERBAIKAN DI SINI ---
-        # Menggunakan raise e agar GitHub Actions menampilkan status ❌ Failed jika API bermasalah.
-        raise e 
-        # -------------------------
+        raise e
 
 # --- HANDLER INTERAKTIF (Untuk mode Server/Polling 24/7) ---
 if bot:
@@ -181,9 +176,7 @@ if __name__ == "__main__":
             send_safe_message(TELEGRAM_CHAT_ID, report)
             print("✅ Berhasil dikirim! Selesai.")
         except Exception:
-            print("❌ Gagal membuat rangkuman. Pesan kegagalan akan dikirim ke Telegram (jika bot aktif).")
-            # Dalam mode cron, kita tidak kirim pesan gagal ke Telegram agar tidak mengotorin channel.
-            # Kita biarkan raise e di get_news_digest mem-failkan GitHub Actions workflow.
+            print("❌ Gagal membuat rangkuman berita.")
             sys.exit(1)
     else:
         print("🤖 Bot interaktif siap melayani 24/7 (Mode Polling)...")
