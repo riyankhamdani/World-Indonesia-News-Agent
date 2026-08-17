@@ -1,3 +1,4 @@
 pyTelegramBotAPI
 requests
-google-genai
+google-generativeai
+tavily-python
