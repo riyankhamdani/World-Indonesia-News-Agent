@@ -73,7 +73,7 @@ def get_news_digest():
         return "❌ Error: GEMINI_API_KEY belum dikonfigurasi."
 
     try:
-        # Menggunakan SDK resmi Google GenAI & Gemini Flash
+        # Menggunakan SDK resmi Google GenAI & Gemini 1.5 Flash
         client = genai.Client(api_key=GEMINI_API_KEY)
         
         prompt = f"""
@@ -105,7 +105,7 @@ Format:
   🔗 Baca selengkapnya: [URL]
 """
         response = client.models.generate_content(
-            model="gemini-2.5-flash",
+            model="gemini-1.5-flash",
             contents=prompt,
         )
         return response.text
