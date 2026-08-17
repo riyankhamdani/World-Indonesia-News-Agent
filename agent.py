@@ -3,7 +3,7 @@ import sys
 import requests
 import telebot
 from datetime import datetime
-from google import genai
+import google.generativeai as genai
 
 # Environment Credentials
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -11,11 +11,9 @@ TAVILY_API_KEY = os.getenv("TAVILY_API_KEY")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID")
 
-# Inisialisasi Bot secara aman
 bot = telebot.TeleBot(TELEGRAM_BOT_TOKEN) if TELEGRAM_BOT_TOKEN else None
 
 def search_tavily(query):
-    """Mencari berita terbaru menggunakan Tavily Search API."""
     if not TAVILY_API_KEY:
         print("⚠️ Warning: TAVILY_API_KEY tidak ditemukan.")
         return []
@@ -73,7 +71,9 @@ def get_news_digest():
         return "❌ Error: GEMINI_API_KEY belum dikonfigurasi."
 
     try:
-        client = genai.Client(api_key=GEMINI_API_KEY)
+        # Konfigurasi SDK google-generativeai
+        genai.configure(api_key=GEMINI_API_KEY)
+        model = genai.GenerativeModel('gemini-1.5-flash')
         
         prompt = f"""
 You are Riyan's News Assistant. Summarize into natural, concise Bahasa Indonesia.
@@ -103,17 +103,13 @@ Format:
   [Ringkasan 1-2 kalimat]
   🔗 Baca selengkapnya: [URL]
 """
-        response = client.models.generate_content(
-            model="gemini-1.5-flash",
-            contents=prompt,
-        )
+        response = model.generate_content(prompt)
         return response.text
     except Exception as e:
         print(f"❌ Error generating summary with LLM: {e}")
         raise e
 
 def send_safe_message(chat_id, text):
-    """Mengirim pesan dengan fallback aman jika Markdown error."""
     if not bot:
         print("❌ Bot instance tidak ditemukan.")
         return
