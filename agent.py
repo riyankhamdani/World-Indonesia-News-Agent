@@ -3,7 +3,7 @@ import sys
 import requests
 import telebot
 from datetime import datetime
-from langchain_groq import ChatGroq
+from groq import Groq
 
 # Environment Credentials
 GROQ_API_KEY = os.getenv("GROQ_API_KEY")
@@ -60,7 +60,7 @@ def search_tavily(query):
         return []
 
 def get_news_digest():
-    """Mengambil berita & merangkumnya menggunakan Groq LLaMA 3.1 Instant."""
+    """Mengambil berita & merangkumnya menggunakan SDK Resmi Groq."""
     today_str = datetime.now().strftime("%B %d, %Y")
     queries = {
         "WORLD": f"breaking news geopolitics world economy today {today_str}",
@@ -73,12 +73,9 @@ def get_news_digest():
         return "❌ Error: GROQ_API_KEY belum dikonfigurasi."
 
     try:
-        # Menggunakan model llama-3.1-8b-instant yang dijamin aktif & anti-decommission di Groq
-        llm = ChatGroq(
-            model_name="llama-3.1-8b-instant",
-            temperature=0.1,
-            api_key=GROQ_API_KEY
-        )
+        # Menggunakan SDK resmi Groq & Model Llama 3.3 70B Versatile
+        client = Groq(api_key=GROQ_API_KEY)
+        
         prompt = f"""
 You are Riyan's News Assistant. Summarize into natural, concise Bahasa Indonesia.
 RAW NEWS: {news_data}
@@ -107,8 +104,14 @@ Format:
   [Ringkasan 1-2 kalimat]
   🔗 Baca selengkapnya: [URL]
 """
-        response = llm.invoke(prompt)
-        return response.content
+        completion = client.chat.completions.create(
+            model="llama-3.3-70b-versatile",
+            messages=[
+                {"role": "user", "content": prompt}
+            ],
+            temperature=0.1
+        )
+        return completion.choices[0].message.content
     except Exception as e:
         print(f"❌ Error generating summary with LLM: {e}")
         raise e
@@ -130,7 +133,7 @@ if bot:
             report = get_news_digest()
             send_safe_message(message.chat.id, report)
         except Exception:
-            send_safe_message(message.chat.id, "⚠️ Gagal membuat rangkuman berita. Kemungkinan API Key Groq bermasalah. Silakan coba beberapa saat lagi.")
+            send_safe_message(message.chat.id, "⚠️ Gagal membuat rangkuman berita. Silakan coba beberapa saat lagi.")
 
     @bot.message_handler(func=lambda msg: True)
     def handle_all_messages(message):
@@ -142,7 +145,7 @@ if bot:
                 report = get_news_digest()
                 send_safe_message(message.chat.id, report)
             except Exception:
-                send_safe_message(message.chat.id, "⚠️ Gagal membuat rangkuman berita. Kemungkinan API Key Groq bermasalah. Silakan coba beberapa saat lagi.")
+                send_safe_message(message.chat.id, "⚠️ Gagal membuat rangkuman berita. Silakan coba beberapa saat lagi.")
         elif "riyan" in text or "oi" in text or text.strip() == "p":
             bot.reply_to(message, "Halo! Riyan-nya lagi rehat/shift malam nih 😴 Kalo mau tau info berita hari ini, ketik 'berita' aja ya!")
         else:
