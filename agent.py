@@ -73,7 +73,6 @@ def get_news_digest():
         return "❌ Error: GEMINI_API_KEY belum dikonfigurasi."
 
     try:
-        # Menggunakan SDK resmi Google GenAI & Gemini 1.5 Flash
         client = genai.Client(api_key=GEMINI_API_KEY)
         
         prompt = f"""
@@ -113,41 +112,6 @@ Format:
         print(f"❌ Error generating summary with LLM: {e}")
         raise e
 
-# --- HANDLER INTERAKTIF (Untuk mode Server/Polling 24/7) ---
-if bot:
-    @bot.message_handler(commands=['start', 'help'])
-    def send_welcome(message):
-        bot.reply_to(
-            message,
-            "Halo! Gue Riyan News Agent Bot 🤖\n\n"
-            "Ketik 'berita' atau /news buat dapet rangkuman berita terbaru hari ini ya!"
-        )
-
-    @bot.message_handler(commands=['news'])
-    def send_news_command(message):
-        bot.reply_to(message, "🔎 Bentar ya, lagi nyariin berita paling fresh hari ini...")
-        try:
-            report = get_news_digest()
-            send_safe_message(message.chat.id, report)
-        except Exception:
-            send_safe_message(message.chat.id, "⚠️ Gagal membuat rangkuman berita. Silakan coba beberapa saat lagi.")
-
-    @bot.message_handler(func=lambda msg: True)
-    def handle_all_messages(message):
-        text = message.text.lower() if message.text else ""
-        
-        if "berita" in text or "news" in text:
-            bot.reply_to(message, "🔎 Bentar ya, lagi nyariin berita paling fresh hari ini...")
-            try:
-                report = get_news_digest()
-                send_safe_message(message.chat.id, report)
-            except Exception:
-                send_safe_message(message.chat.id, "⚠️ Gagal membuat rangkuman berita. Silakan coba beberapa saat lagi.")
-        elif "riyan" in text or "oi" in text or text.strip() == "p":
-            bot.reply_to(message, "Halo! Riyan-nya lagi rehat/shift malam nih 😴 Kalo mau tau info berita hari ini, ketik 'berita' aja ya!")
-        else:
-            bot.reply_to(message, "Ketik 'berita' kalau mau dapet update berita terbaru hari ini ya! 😉")
-
 def send_safe_message(chat_id, text):
     """Mengirim pesan dengan fallback aman jika Markdown error."""
     if not bot:
@@ -159,7 +123,6 @@ def send_safe_message(chat_id, text):
         print(f"⚠️ Gagal kirim via Markdown ({e}). Mencoba kirim teks biasa...")
         bot.send_message(chat_id, text, disable_web_page_preview=True)
 
-# --- PENENTU MODE EKSEKUSI ---
 if __name__ == "__main__":
     is_cron_mode = "--cron" in sys.argv or os.getenv("RUN_MODE") == "cron"
 
