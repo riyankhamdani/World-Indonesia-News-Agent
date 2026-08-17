@@ -2,8 +2,8 @@ name: Daily News Bot Execution (Jam 5 Sore WIB)
 
 on:
   schedule:
-    - cron: '0 10 * * *'  # Jam 10:00 UTC = Jam 17:00 WIB
-  workflow_dispatch:      # Biar bisa diklik manual
+    - cron: '0 10 * * *'  # Jam 10:00 UTC = Jam 17:00 (5 sore) WIB
+  workflow_dispatch:      # Tombol manual eksekusi
 
 jobs:
   run-bot:
