@@ -60,21 +60,19 @@ def search_tavily(query):
         return []
 
 def generate_summary_with_retry(client, prompt, max_retries=5):
-    """Memanggil Gemini API dengan retry mechanism (exponential backoff) untuk error 503."""
-    # Menggunakan model produksi stabil versi terbaru: gemini-2.5-flash
-    model_name = "gemini-2.5-flash" 
+    """Memanggil Gemini API via Chat session dengan retry mechanism untuk menangani error 503."""
+    model_name = "gemini-3.6-flash"
 
     for attempt in range(1, max_retries + 1):
         try:
-            response = client.models.generate_content(
-                model=model_name,
-                contents=prompt,
-            )
+            # Menggunakan client.chats.create untuk menghindari warning AFC pada generate_content
+            chat = client.chats.create(model=model_name)
+            response = chat.send_message(prompt)
             return response.text
         except (APIError, Exception) as e:
             err_msg = str(e)
             if "503" in err_msg or "UNAVAILABLE" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                wait_time = attempt * 6  # Jeda bertahap: 6s, 12s, 18s, 24s...
+                wait_time = attempt * 6  # Delay bertahap: 6s, 12s, 18s, 24s...
                 print(f"⚠️ Server Gemini sibuk/503 (Percobaan {attempt}/{max_retries}). Menunggu {wait_time} detik...")
                 time.sleep(wait_time)
             else:
