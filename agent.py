@@ -1,9 +1,11 @@
 import os
 import sys
+import time
 import requests
 import telebot
 from datetime import datetime
 from google import genai
+from google.genai.errors import APIError
 
 # Environment Credentials
 GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
@@ -57,6 +59,29 @@ def search_tavily(query):
         print(f"❌ Error fetching news from Tavily: {e}")
         return []
 
+def generate_summary_with_retry(client, prompt, max_retries=5):
+    """Memanggil Gemini API dengan retry mechanism (exponential backoff) untuk error 503."""
+    # Menggunakan model produksi stabil versi terbaru: gemini-2.5-flash
+    model_name = "gemini-2.5-flash" 
+
+    for attempt in range(1, max_retries + 1):
+        try:
+            response = client.models.generate_content(
+                model=model_name,
+                contents=prompt,
+            )
+            return response.text
+        except (APIError, Exception) as e:
+            err_msg = str(e)
+            if "503" in err_msg or "UNAVAILABLE" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
+                wait_time = attempt * 6  # Jeda bertahap: 6s, 12s, 18s, 24s...
+                print(f"⚠️ Server Gemini sibuk/503 (Percobaan {attempt}/{max_retries}). Menunggu {wait_time} detik...")
+                time.sleep(wait_time)
+            else:
+                print(f"❌ Gemini Error non-transient: {e}")
+                raise e
+    raise Exception("Gagal mendapatkan respons dari Gemini API setelah batas maksimum retry.")
+
 def get_news_digest():
     """Mengambil berita & merangkumnya menggunakan Google Gemini API."""
     today_str = datetime.now().strftime("%B %d, %Y")
@@ -101,12 +126,7 @@ Format:
   [Ringkasan 1-2 kalimat]
   🔗 Baca selengkapnya: [URL]
 """
-        # Menggunakan gemini-3.6-flash sesuai rekomendasi API
-        response = client.models.generate_content(
-            model="gemini-3.6-flash",
-            contents=prompt,
-        )
-        return response.text
+        return generate_summary_with_retry(client, prompt)
     except Exception as e:
         print(f"❌ Error generating summary with LLM: {e}")
         raise e
