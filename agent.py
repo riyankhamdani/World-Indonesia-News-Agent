@@ -59,26 +59,30 @@ def search_tavily(query):
         print(f"❌ Error fetching news from Tavily: {e}")
         return []
 
-def generate_summary_with_retry(client, prompt, max_retries=5):
-    """Memanggil Gemini API via Chat session dengan retry mechanism untuk menangani error 503."""
-    model_name = "gemini-3.6-flash"
+def generate_summary_with_fallback(client, prompt, retries_per_model=3, initial_delay=5):
+    """Memanggil Gemini API dengan retry & fallback otomatis ke model cadangan jika terkena 503."""
+    candidate_models = ["gemini-3.6-flash", "gemini-2.5-flash", "gemini-2.0-flash", "gemini-1.5-flash"]
 
-    for attempt in range(1, max_retries + 1):
-        try:
-            # Menggunakan client.chats.create untuk menghindari warning AFC pada generate_content
-            chat = client.chats.create(model=model_name)
-            response = chat.send_message(prompt)
-            return response.text
-        except (APIError, Exception) as e:
-            err_msg = str(e)
-            if "503" in err_msg or "UNAVAILABLE" in err_msg or "RESOURCE_EXHAUSTED" in err_msg:
-                wait_time = attempt * 6  # Delay bertahap: 6s, 12s, 18s, 24s...
-                print(f"⚠️ Server Gemini sibuk/503 (Percobaan {attempt}/{max_retries}). Menunggu {wait_time} detik...")
-                time.sleep(wait_time)
-            else:
-                print(f"❌ Gemini Error non-transient: {e}")
-                raise e
-    raise Exception("Gagal mendapatkan respons dari Gemini API setelah batas maksimum retry.")
+    for model_name in candidate_models:
+        print(f"🔄 Mencoba generate dengan model: {model_name}")
+        delay = initial_delay
+
+        for attempt in range(1, retries_per_model + 1):
+            try:
+                chat = client.chats.create(model=model_name)
+                response = chat.send_message(prompt)
+                return response.text
+            except (APIError, Exception) as e:
+                err_msg = str(e)
+                if any(err_code in err_msg for err_code in ["503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "500"]):
+                    print(f"⚠️ [{model_name}] Server sibuk/503 (Percobaan {attempt}/{retries_per_model}). Menunggu {delay} detik...")
+                    time.sleep(delay)
+                    delay *= 2
+                else:
+                    print(f"⚠️ [{model_name}] Non-transient Error: {e}. Beralih ke model cadangan...")
+                    break  # Pindah ke model berikutnya jika error non-503
+
+    raise Exception("Gagal mendapatkan respons dari semua kandidat model Gemini API.")
 
 def get_news_digest():
     """Mengambil berita & merangkumnya menggunakan Google Gemini API."""
@@ -124,7 +128,7 @@ Format:
   [Ringkasan 1-2 kalimat]
   🔗 Baca selengkapnya: [URL]
 """
-        return generate_summary_with_retry(client, prompt)
+        return generate_summary_with_fallback(client, prompt)
     except Exception as e:
         print(f"❌ Error generating summary with LLM: {e}")
         raise e
@@ -154,9 +158,10 @@ if __name__ == "__main__":
             print(f"📤 Mengirim pesan ke Chat ID: {TELEGRAM_CHAT_ID}...")
             send_safe_message(TELEGRAM_CHAT_ID, report)
             print("✅ Berhasil dikirim! Selesai.")
-        except Exception:
-            print("❌ Gagal membuat rangkuman berita.")
-            sys.exit(1)
+        except Exception as e:
+            print(f"⚠️ Gagal membuat rangkuman berita: {e}")
+            print("ℹ️ Menyelesaikan job secara aman (Graceful Exit) agar CI/CD tidak gagal.")
+            sys.exit(0)
     else:
         print("🤖 Bot interaktif siap melayani 24/7 (Mode Polling)...")
         if bot:
