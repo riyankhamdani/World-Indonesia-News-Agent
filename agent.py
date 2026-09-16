@@ -61,8 +61,12 @@ def search_tavily(query):
 
 def generate_summary_with_fallback(client, prompt, retries_per_model=3, initial_delay=5):
     """Memanggil Gemini API dengan retry & fallback otomatis ke model cadangan yang aktif."""
-    # Menggunakan model yang aktif saat ini (Mencegah Error 404)
-    candidate_models = ["gemini-3.6-flash", "gemini-2.5-flash-lite", "gemini-2.5-pro"]
+    # Menggunakan daftar model generasi terbaru (Mencegah Error 404)
+    candidate_models = [
+        "gemini-3.6-flash", 
+        "gemini-3.5-flash-lite", 
+        "gemini-3.1-pro-preview"
+    ]
 
     for model_name in candidate_models:
         print(f"🔄 Mencoba generate dengan model: {model_name}")
@@ -75,14 +79,14 @@ def generate_summary_with_fallback(client, prompt, retries_per_model=3, initial_
                 return response.text
             except (APIError, Exception) as e:
                 err_msg = str(e)
-                # Menangani transient error seperti 503, 500, UNAVAILABLE,RESOURCE_EXHAUSTED
+                # Menangani transient error seperti 503, 500, UNAVAILABLE, RESOURCE_EXHAUSTED
                 if any(err_code in err_msg for err_code in ["503", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "500"]):
                     print(f"⚠️ [{model_name}] Server sibuk/503 (Percobaan {attempt}/{retries_per_model}). Menunggu {delay} detik...")
                     time.sleep(delay)
                     delay *= 2
                 else:
                     print(f"⚠️ [{model_name}] Non-transient Error: {e}. Beralih ke model cadangan...")
-                    break  # Pindah ke kandidat model berikutnya jika error 404/400
+                    break  # Pindah ke kandidat model berikutnya jika error non-503
 
     raise Exception("Gagal mendapatkan respons dari semua kandidat model Gemini API.")
 
