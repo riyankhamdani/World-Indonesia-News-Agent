@@ -60,16 +60,14 @@ def search_tavily(query):
         print(f"❌ Error fetching news from Tavily: {e}")
         return []
 
-def generate_summary_with_fallback(client, prompt, retries_per_model=3, initial_delay=5):
+def generate_summary_with_fallback(client, prompt, retries_per_model=4, initial_delay=8):
     """Memanggil Gemini API dengan retry, jitter, & fallback otomatis ke model cadangan."""
-    # Daftar model bertingkat dari versi terbaru hingga versi stabil berkapasitas tinggi
+    # List model Gemini 3.x aktif (Model 1.x dan 2.x yang sudah deprecated di-remove)
     candidate_models = [
-        "gemini-3.6-flash", 
-        "gemini-3.5-flash-lite", 
+        "gemini-3.6-flash",
+        "gemini-3.5-flash",
+        "gemini-3.5-flash-lite",
         "gemini-3.1-pro-preview",
-        "gemini-2.5-flash",       # Candidate stabil generasi terbaru
-        "gemini-2.0-flash",       # High-capacity production model
-        "gemini-1.5-flash"        # Fallback paling ringan / ultra-high capacity
     ]
 
     for model_name in candidate_models:
@@ -82,16 +80,22 @@ def generate_summary_with_fallback(client, prompt, retries_per_model=3, initial_
                 return response.text
             except (APIError, Exception) as e:
                 err_msg = str(e)
+                
+                # Jika model 404 / NOT_FOUND / deprecated, langsung lewati ke model berikutnya
+                if "404" in err_msg or "NOT_FOUND" in err_msg:
+                    print(f"⚠️ [{model_name}] Model tidak tersedia / 404 NOT_FOUND. Meminta model berikutnya...")
+                    break
+
                 transient_errors = ["503", "500", "429", "UNAVAILABLE", "RESOURCE_EXHAUSTED", "DEADLINE_EXHAUSTED"]
                 
-                # Menangani transient error dengan exponential backoff + jitter
+                # Menangani transient error dengan exponential backoff + randomized jitter
                 if any(code in err_msg for code in transient_errors):
-                    delay = (initial_delay * (2 ** (attempt - 1))) + random.uniform(1.0, 3.0)
+                    delay = (initial_delay * (2 ** (attempt - 1))) + random.uniform(2.0, 5.0)
                     print(f"⚠️ [{model_name}] Server sibuk/transient error ({attempt}/{retries_per_model}). Menunggu {delay:.1f}s...")
                     time.sleep(delay)
                 else:
                     print(f"⚠️ [{model_name}] Non-transient Error: {e}. Beralih ke model cadangan...")
-                    break  # Pindah ke kandidat model berikutnya jika error non-503/404/dll
+                    break  # Pindah ke kandidat model berikutnya jika error non-transient
 
     raise Exception("Gagal mendapatkan respons dari semua kandidat model Gemini API.")
 
